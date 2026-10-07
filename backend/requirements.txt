@@ -9,6 +9,7 @@ python-dotenv>=1.0.1
 livekit>=0.18.0
 livekit-agents>=0.12.0
 livekit-plugins-silero>=0.8.0
+livekit-plugins-sarvam>=1.8.5
 livekit-plugins-deepgram>=0.8.0
 livekit-plugins-cartesia>=0.8.0
 

@@ -1,26 +1,40 @@
-"""Streaming Speech-to-Text (STT) provider using Deepgram."""
+"""Streaming Speech-to-Text (STT) provider supporting Sarvam AI and Deepgram."""
 
-from typing import Optional
-from livekit.plugins import deepgram
+from typing import Optional, Any
 from app.config.settings import settings
 
 
 def get_stt(
-    language: str = "en",
-    model: str = "nova-2",
+    provider: Optional[str] = None,
+    language: str = "en-IN",
+    model: Optional[str] = None,
     api_key: Optional[str] = None,
-) -> deepgram.STT:
+) -> Any:
     """
-    Initialize Deepgram streaming STT plugin.
+    Initialize streaming STT plugin based on provider strategy.
 
-    Args:
-        language: BCP-47 language tag (e.g., 'en', 'en-IN').
-        model: Deepgram model name ('nova-2' is standard for low-latency voice).
-        api_key: Optional Deepgram API key (defaults to settings.deepgram_api_key).
+    Supported providers:
+      - 'sarvam' (default): Sarvam AI Saaras model (optimized for Indian English, Hindi, and regional languages)
+      - 'deepgram': Deepgram Nova-2 streaming STT
     """
+    active_provider = provider or settings.stt_provider.lower()
+
+    if active_provider == "sarvam":
+        from livekit.plugins import sarvam
+        key = api_key or settings.sarvam_api_key
+        stt_model = model or "saaras:v4"
+        return sarvam.STT(
+            api_key=key,
+            language=language,
+            model=stt_model,
+        )
+
+    # Fallback to Deepgram
+    from livekit.plugins import deepgram
     key = api_key or settings.deepgram_api_key
+    stt_model = model or "nova-2"
     return deepgram.STT(
         api_key=key,
         language=language,
-        model=model,
+        model=stt_model,
     )

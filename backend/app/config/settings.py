@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     livekit_api_secret: Optional[str] = Field(default=None, alias="LIVEKIT_API_SECRET")
 
     # Speech Services
+    stt_provider: str = Field(default="sarvam", alias="STT_PROVIDER")  # "sarvam" or "deepgram"
+    tts_provider: str = Field(default="sarvam", alias="TTS_PROVIDER")  # "sarvam" or "cartesia"
+    sarvam_api_key: Optional[str] = Field(default=None, alias="SARVAM_API_KEY")
     deepgram_api_key: Optional[str] = Field(default=None, alias="DEEPGRAM_API_KEY")
     cartesia_api_key: Optional[str] = Field(default=None, alias="CARTESIA_API_KEY")
     elevenlabs_api_key: Optional[str] = Field(default=None, alias="ELEVENLABS_API_KEY")

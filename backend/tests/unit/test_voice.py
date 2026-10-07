@@ -33,13 +33,23 @@ def test_vad_instance_creation():
 
 
 def test_stt_provider_initialization():
-    stt = get_stt(language="en-IN", model="nova-2", api_key="test_dummy_key")
-    assert stt is not None
+    # Test Sarvam STT
+    stt_sarvam = get_stt(provider="sarvam", language="en-IN", model="saaras:v4", api_key="test_sarvam_key")
+    assert stt_sarvam is not None
+
+    # Test Deepgram STT fallback
+    stt_deepgram = get_stt(provider="deepgram", language="en-IN", model="nova-2", api_key="test_deepgram_key")
+    assert stt_deepgram is not None
 
 
 def test_tts_provider_initialization():
-    tts = get_tts(model="sonic-english", api_key="test_dummy_key")
-    assert tts is not None
+    # Test Sarvam TTS
+    tts_sarvam = get_tts(provider="sarvam", model="bulbul:v3", api_key="test_sarvam_key")
+    assert tts_sarvam is not None
+
+    # Test Cartesia TTS fallback
+    tts_cartesia = get_tts(provider="cartesia", model="sonic-english", api_key="test_cartesia_key")
+    assert tts_cartesia is not None
 
 
 @pytest.mark.asyncio
