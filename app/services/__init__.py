@@ -1,1 +1,1 @@
-"""Business logic and external integration services."""
+"""Domain services — orders, customers, businesses."""

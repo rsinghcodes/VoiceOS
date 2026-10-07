@@ -1,1503 +1,2788 @@
-# DineVoice — Production-Grade AI Voice Agent for Restaurant Food Ordering
+# VoiceOS — Brain
 
-> A production-grade, real-time AI voice agent that allows customers to **order food directly from a restaurant using natural voice conversations**.
+> **Architecture and engineering source of truth for the VoiceOS platform.**
 
-DineVoice acts as an AI-powered restaurant phone assistant. Customers can ask about the menu, customize dishes, add items to their cart, confirm their order, provide delivery details, and place an order — all through a natural voice conversation.
+VoiceOS is a **production-grade, configurable AI voice agent platform** designed to let businesses interact with customers through natural voice conversations.
 
-The project focuses not only on conversational AI, but also on **real-time voice processing, agentic workflows, RAG, tool calling, latency optimization, reliability, observability, evaluation, and production deployment**.
+The platform separates the **generic AI/voice infrastructure** from **business-specific capabilities and integrations**.
 
----
+The first implementation is a **restaurant food-ordering agent**, but the core architecture is intentionally designed to support other business workflows such as:
 
-## 🎯 Problem
+- Restaurant food ordering
+- Salon appointment booking
+- Hotel services
+- E-commerce ordering
+- Service-business bookings
+- Customer support workflows
 
-Restaurants often receive a large number of phone calls for:
+The objective is not to build multiple unrelated voice bots.
 
-- Food ordering
-- Menu questions
-- Item availability
-- Price inquiries
-- Customization requests
-- Delivery information
-- Order status
-- Order cancellation
-
-Handling these calls manually can be expensive and difficult to scale, especially during peak hours.
-
-DineVoice aims to automate this process with an AI voice agent that can understand customers and interact with the restaurant's ordering system.
+The objective is to build **one reusable AI voice-agent platform with configurable business capabilities.**
 
 ---
 
-# 🚀 What DineVoice Does
+# 1. Product Vision
 
-A customer can call the restaurant and have a conversation such as:
+## The Problem
 
-> **Customer:** Hi, I'd like to order two chicken burgers and one fries.
+Businesses receive repetitive phone calls for tasks such as:
 
-> **AI:** Sure. Would you like the burgers with the regular or spicy sauce?
+- Product/service questions
+- Availability checks
+- Orders
+- Bookings
+- Cancellations
+- Modifications
+- Status queries
+- FAQs
+- Customer support
 
-> **Customer:** One regular and one spicy.
+Traditional IVR systems rely heavily on:
 
-> **AI:** Got it. I've added two chicken burgers and one fries to your cart. Your current total is ₹420. Would you like to add a drink?
+```text
+Press 1 for Orders
+Press 2 for Support
+Press 3 for Delivery
+```
 
-> **Customer:** Yes, add one Coke.
+They are rigid and difficult to maintain.
 
-> **AI:** Done. Your total is now ₹470. Would you like delivery or pickup?
+VoiceOS replaces this with a conversational interface:
 
-The agent then collects the required information, confirms the complete order, and places it through the restaurant's ordering backend.
-
----
-
-# 🧠 Core Capabilities
-
-### Voice Ordering
-
-Customers can place complete food orders using natural speech.
-
-- Understand natural language
-- Handle different accents and speaking styles
-- Understand quantities
-- Understand food names
-- Handle corrections
-- Handle follow-up questions
-- Maintain conversation context
-
-### Menu Discovery
-
-Customers can ask:
-
-- "What pizzas do you have?"
-- "Do you have vegetarian burgers?"
-- "What's the cheapest meal?"
-- "What comes with the chicken combo?"
-- "Do you have anything spicy?"
-
-The agent retrieves relevant menu information before responding.
-
-### Food Customization
-
-The agent can understand requests such as:
-
-- No onions
-- Extra cheese
-- Less spicy
-- Add sauce
-- Remove tomato
-- Extra toppings
-- Make it vegetarian
-- Change size
-
-### Cart Management
-
-Customers can:
-
-- Add items
-- Remove items
-- Change quantity
-- Modify customizations
-- Review their cart
-- Start over
-
-### Order Placement
-
-Before placing an order, the agent confirms:
-
-- Items
-- Quantities
-- Customizations
-- Subtotal
-- Taxes
-- Delivery charges
-- Discounts
-- Final amount
-- Delivery/pickup method
-- Customer information
-
-The order is only submitted after explicit confirmation.
-
-### Order Status
-
-Customers can ask:
-
-> "Where is my order?"
-
-> "Has my order been prepared?"
-
-> "When will it arrive?"
-
-The agent can retrieve order information from the restaurant's backend.
-
-### Human Handoff
-
-The agent can transfer the conversation to a human when:
-
-- Customer explicitly requests an employee
-- The request is outside the supported workflow
-- The system cannot confidently understand the order
-- Payment/order processing fails
-- The customer has a complex complaint
+```text
+Customer
+   │
+   │ Natural speech
+   ▼
+AI Voice Agent
+   │
+   ├── Understand intent
+   ├── Retrieve information
+   ├── Ask clarification
+   ├── Execute business operations
+   └── Confirm result
+```
 
 ---
 
-# 🏗️ System Architecture
+# 2. Core Architectural Principle
+
+The most important design decision is:
+
+> **The AI agent should not contain business-specific logic.**
+
+The agent should understand generic concepts such as:
+
+```text
+Catalog
+Product
+Service
+Availability
+Cart
+Order
+Booking
+Customer
+Payment
+Fulfillment
+Status
+```
+
+Business-specific behavior is provided through:
+
+```text
+Business Configuration
++
+Capabilities
++
+Business Adapters
++
+Business Knowledge
+```
+
+Therefore:
+
+```text
+VoiceOS Core
+     │
+     ├── Restaurant configuration
+     ├── Salon configuration
+     ├── Hotel configuration
+     └── E-commerce configuration
+```
+
+The core voice and agent infrastructure remains reusable.
+
+---
+
+# 3. Architecture Goals
+
+The system is designed around the following goals.
+
+## G1 — Business Agnostic
+
+The core should not contain restaurant-specific assumptions.
+
+Bad:
+
+```python
+create_pizza_order()
+```
+
+Better:
+
+```python
+create_order()
+```
+
+Bad:
+
+```python
+check_table_availability()
+```
+
+Better:
+
+```python
+check_availability()
+```
+
+The business adapter determines what the operation actually means.
+
+---
+
+## G2 — Configuration Driven
+
+Business behavior should be controlled by configuration wherever possible.
+
+Example:
+
+```yaml
+business:
+  id: restaurant_001
+  type: restaurant
+  name: 'ABC Restaurant'
+
+capabilities:
+  - catalog
+  - ordering
+  - delivery
+  - order_tracking
+  - cancellation
+```
+
+Another business:
+
+```yaml
+business:
+  id: salon_001
+  type: salon
+  name: 'ABC Salon'
+
+capabilities:
+  - services
+  - appointment_booking
+  - appointment_rescheduling
+  - appointment_cancellation
+```
+
+The same agent platform can serve both.
+
+---
+
+## G3 — LLM Does Not Own Business State
+
+The LLM is responsible for:
+
+- Understanding language
+- Reasoning about intent
+- Selecting tools
+- Producing natural responses
+
+The application is responsible for:
+
+- Cart state
+- Prices
+- Availability
+- Orders
+- Payments
+- Authentication
+- Business rules
+- Transaction integrity
+
+This separation is critical.
+
+```text
+             LLM
+              │
+              │ decides what it wants to do
+              ▼
+        Tool Invocation
+              │
+              ▼
+       Application Logic
+              │
+              │ validates
+              ▼
+         Business API
+              │
+              ▼
+           Database
+```
+
+---
+
+# 4. High-Level Architecture
 
 ```text
                          CUSTOMER
                             │
-                            │ Phone / Voice
+                            │ Voice
                             ▼
-                    ┌─────────────────┐
-                    │     LiveKit     │
-                    │ WebRTC / Audio  │
-                    └────────┬────────┘
+                  ┌─────────────────────┐
+                  │       LiveKit       │
+                  │   WebRTC / Audio    │
+                  └──────────┬──────────┘
                              │
                              ▼
-                    ┌─────────────────┐
-                    │  Voice Activity │
-                    │   Detection     │
-                    └────────┬────────┘
+                  ┌─────────────────────┐
+                  │   Voice Pipeline    │
+                  │                     │
+                  │ VAD → STT → TTS     │
+                  └──────────┬──────────┘
                              │
                              ▼
-                    ┌─────────────────┐
-                    │       STT       │
-                    │ Speech → Text   │
-                    └────────┬────────┘
+                  ┌─────────────────────┐
+                  │  Conversation Layer │
+                  │                     │
+                  │ Session Management  │
+                  │ Turn Management     │
+                  │ Interruption        │
+                  └──────────┬──────────┘
                              │
                              ▼
-                    ┌─────────────────┐
-                    │   LangGraph     │
-                    │  Agent Workflow │
-                    └────────┬────────┘
+                  ┌─────────────────────┐
+                  │    Agent Engine     │
+                  │      LangGraph      │
+                  │                     │
+                  │ State / Routing     │
+                  │ Reasoning / Tools   │
+                  └──────────┬──────────┘
                              │
-              ┌──────────────┼──────────────┐
-              │              │              │
-              ▼              ▼              ▼
-        ┌──────────┐   ┌────────────┐   ┌───────────┐
-        │   RAG    │   │   Tools    │   │   State   │
-        │  Qdrant  │   │ Order API  │   │  Memory   │
-        └──────────┘   └────────────┘   └───────────┘
-              │              │              │
-              ▼              ▼              ▼
-        ┌─────────────────────────────────────────┐
-        │       Restaurant Backend / Database     │
-        │                                         │
-        │ Menu │ Inventory │ Cart │ Orders │ User │
-        └────────────────────┬────────────────────┘
-                             │
-                             ▼
-                    ┌─────────────────┐
-                    │       LLM       │
-                    │ Reasoning / NLU │
-                    └────────┬────────┘
+                ┌────────────┼────────────┐
+                │            │            │
+                ▼            ▼            ▼
+             RAG         Tool Layer    Memory
+                │            │            │
+                │            ▼            │
+                │      Capability Layer   │
+                │            │            │
+                │            ▼            │
+                │    Business Adapter    │
+                │            │            │
+                └────────────┼────────────┘
                              │
                              ▼
-                    ┌─────────────────┐
-                    │       TTS       │
-                    │ Text → Speech   │
-                    └────────┬────────┘
+                    Business Systems
                              │
-                             ▼
-                    ┌─────────────────┐
-                    │     LiveKit     │
-                    │ Streaming Audio │
-                    └────────┬────────┘
-                             │
-                             ▼
-                         CUSTOMER
+          ┌──────────────────┼──────────────────┐
+          ▼                  ▼                  ▼
+      PostgreSQL          External APIs       Redis
+          │
+          ▼
+       Qdrant
 ```
 
 ---
 
-# 🛠️ Tech Stack
+# 5. Technology Stack
 
-## AI / LLM
+## Primary Stack
 
-- Python
-- Gemini 3.8 flash
-- Open-source LLMs
-- Hugging Face Transformers
-- LangGraph
-- LangChain
-- Pydantic
-- Structured Outputs
-- Function / Tool Calling
+| Layer             | Technology               | Why                                                        |
+| ----------------- | ------------------------ | ---------------------------------------------------------- |
+| Language          | Python                   | Strong AI/ML ecosystem and excellent async/backend support |
+| Voice transport   | LiveKit                  | Real-time audio infrastructure and WebRTC support          |
+| Protocol          | WebRTC                   | Low-latency real-time communication                        |
+| STT               | Streaming STT provider   | Converts speech to text with low latency                   |
+| TTS               | Streaming TTS provider   | Produces natural streaming speech                          |
+| Agent             | LangGraph                | Stateful, controllable agent workflows                     |
+| LLM               | API + open-source models | Allows quality/cost/latency comparison                     |
+| Backend           | FastAPI                  | High-performance async Python API framework                |
+| Validation        | Pydantic                 | Strong typed validation and structured data                |
+| RAG               | Qdrant                   | Vector search with metadata filtering                      |
+| Database          | PostgreSQL               | Reliable transactional business data                       |
+| Cache             | Redis                    | Fast session/cache/state-support layer                     |
+| ORM               | SQLAlchemy               | Mature Python database abstraction                         |
+| Migrations        | Alembic                  | Reliable PostgreSQL schema migrations                      |
+| Containers        | Docker                   | Reproducible deployment                                    |
+| Cloud             | AWS                      | Production deployment and infrastructure experience        |
+| Testing           | Pytest                   | Python testing standard                                    |
+| Load testing      | Locust                   | Realistic concurrent-load testing                          |
+| Observability     | OpenTelemetry            | Distributed tracing and telemetry                          |
+| Monitoring        | CloudWatch               | AWS-native monitoring                                      |
+| Model serving     | vLLM                     | High-throughput LLM inference experiments                  |
+| Model development | Hugging Face + PyTorch   | Open-source model experimentation and fine-tuning          |
 
 ---
 
-## 🎙️ Voice AI
+# 6. Why Python?
 
-- LiveKit
+Python is the primary language.
+
+It is used because VoiceOS combines:
+
+```text
+AI
++
+LLMs
++
+RAG
++
+Voice
++
+Backend APIs
++
+Evaluation
++
+Model inference
+```
+
+Python provides mature libraries for all of these areas.
+
+It also allows the same language to be used across:
+
+- Agent logic
+- RAG
+- Evaluation
+- Backend
+- Model experimentation
+- Data processing
+- Testing
+
+This reduces unnecessary technology fragmentation.
+
+---
+
+# 7. Why FastAPI?
+
+FastAPI is the primary backend framework.
+
+Responsibilities include:
+
+```text
+REST APIs
+Authentication
+Business APIs
+Webhook handling
+Health checks
+Admin APIs
+Order APIs
+Evaluation APIs
+```
+
+Why FastAPI?
+
+### Async-first
+
+Voice applications involve many I/O operations:
+
+```text
+STT
+LLM
+TTS
+Database
+Vector DB
+External APIs
+```
+
+Async execution is important for handling concurrent sessions efficiently.
+
+### Type safety
+
+FastAPI integrates naturally with Pydantic.
+
+Example:
+
+```python
+class CreateOrderRequest(BaseModel):
+    customer_id: str
+    items: list[OrderItem]
+```
+
+### API documentation
+
+FastAPI automatically generates OpenAPI documentation.
+
+This is useful when connecting external business systems.
+
+---
+
+# 8. Why LiveKit?
+
+LiveKit is the real-time communication layer.
+
+Responsibilities:
+
+- Audio transport
 - WebRTC
+- Voice sessions
+- Participant management
 - Streaming audio
-- Speech-to-Text (STT)
-- Text-to-Speech (TTS)
-- Voice Activity Detection (VAD)
-- Audio streaming
-- Interruption / Barge-in handling
+- Real-time communication
 
----
+We don't want to build WebRTC infrastructure ourselves.
 
-## 🧠 Agent Architecture
-
-- LangGraph
-- Stateful workflows
-- Tool calling
-- Conditional routing
-- Agent state
-- Short-term conversation memory
-- Retry mechanisms
-- Fallback strategies
-- Human-in-the-loop
-- Structured tool execution
-
----
-
-## 📚 RAG
-
-- Embedding models
-- Qdrant
-- Vector similarity search
-- Metadata filtering
-- Hybrid retrieval
-- Reranking
-- Context compression
-
-### Knowledge Base
-
-The RAG system can contain:
+LiveKit allows the project to focus on:
 
 ```text
-Restaurant Information
-├── Menu
-│   ├── Categories
-│   ├── Items
-│   ├── Ingredients
-│   ├── Prices
-│   └── Customizations
-│
-├── Dietary Information
-│   ├── Vegetarian
-│   ├── Vegan
-│   ├── Allergens
-│   └── Dietary restrictions
-│
-├── Restaurant Policies
-│   ├── Delivery areas
-│   ├── Minimum order
-│   ├── Cancellation policy
-│   └── Refund policy
-│
-└── FAQs
-    ├── Opening hours
-    ├── Delivery time
-    ├── Payment methods
-    └── Contact information
+AI
+Agent behavior
+Latency
+Reliability
+Business workflows
+```
+
+instead of implementing low-level real-time communication infrastructure.
+
+---
+
+# 9. Why WebRTC?
+
+Voice interaction requires low-latency bidirectional communication.
+
+WebRTC provides:
+
+- Real-time media transport
+- Low latency
+- Audio streaming
+- Browser/device compatibility
+
+The architecture treats the voice channel independently from the agent.
+
+Therefore the same agent engine could potentially receive input from:
+
+```text
+Phone
+WebRTC
+Web application
+Future voice channels
+```
+
+without changing the business logic.
+
+---
+
+# 10. Voice Pipeline
+
+The voice pipeline is:
+
+```text
+Audio Input
+     │
+     ▼
+    VAD
+     │
+     ▼
+Streaming STT
+     │
+     ▼
+Transcript
+     │
+     ▼
+Agent
+     │
+     ▼
+Streaming TTS
+     │
+     ▼
+Audio Output
 ```
 
 ---
 
-# 🍔 Food Ordering Tools
+# 11. Voice Activity Detection
 
-The AI agent interacts with the restaurant backend through controlled tools.
+VAD determines:
 
 ```text
-get_menu()
+When the customer starts speaking
+When the customer stops speaking
+```
 
-search_menu(query)
+This prevents unnecessary processing of silence.
 
-get_item_details(item_id)
+It is important for:
 
-check_item_availability(item_id)
+- Latency
+- Cost
+- Turn detection
+- Interruption handling
 
-add_to_cart(
-    item_id,
-    quantity,
-    customizations
-)
+---
 
-remove_from_cart(item_id)
+# 12. Streaming STT
 
-update_cart_item(
-    item_id,
-    quantity
-)
+Speech-to-text should operate in streaming mode where supported.
 
+Instead of:
+
+```text
+Wait for complete sentence
+        ↓
+Send to STT
+        ↓
+Receive transcript
+```
+
+we aim for:
+
+```text
+Speech
+ ↓
+Partial transcript
+ ↓
+Updated transcript
+ ↓
+Final transcript
+```
+
+This reduces perceived latency.
+
+---
+
+# 13. Streaming TTS
+
+The response should also be streamed.
+
+Instead of:
+
+```text
+Generate entire response
+       ↓
+Generate entire audio
+       ↓
+Play audio
+```
+
+use:
+
+```text
+LLM tokens
+     ↓
+TTS chunks
+     ↓
+Audio chunks
+     ↓
+Customer
+```
+
+This allows the agent to start speaking sooner.
+
+---
+
+# 14. Barge-In / Interruption Handling
+
+Natural conversations require interruption support.
+
+Example:
+
+```text
+AI:
+"Your total is ₹650 and your estimated delivery—"
+
+Customer:
+"Wait, remove the Coke."
+
+AI stops speaking.
+```
+
+The system should:
+
+1. Detect customer speech
+2. Stop current TTS playback
+3. Preserve relevant conversation state
+4. Process the new request
+5. Continue the conversation
+
+This is a major requirement for natural voice interaction.
+
+---
+
+# 15. Why LangGraph?
+
+LangGraph is the agent orchestration framework.
+
+It is preferred because the application requires:
+
+- Explicit state
+- Multi-step workflows
+- Conditional routing
+- Tool execution
+- Retry handling
+- Human handoff
+- Long-running workflows
+- Checkpointing/state persistence
+
+A generic chain is insufficient for these workflows.
+
+Example:
+
+```text
+START
+  │
+  ▼
+Understand Intent
+  │
+  ├── Question ──────────► RAG
+  │
+  ├── Order ─────────────► Catalog
+  │
+  ├── Existing Order ────► Order Status
+  │
+  └── Human Request ─────► Human Handoff
+```
+
+---
+
+# 16. Agent State
+
+LangGraph maintains application-level agent state.
+
+Example:
+
+```python
+class AgentState(TypedDict):
+    session_id: str
+    business_id: str
+    customer_id: str
+    messages: list
+    intent: str | None
+    cart_id: str | None
+    order_id: str | None
+    tool_results: list
+    confidence: float | None
+```
+
+State should contain only information required by the workflow.
+
+Large conversation histories should not be blindly passed to the LLM.
+
+---
+
+# 17. Why Pydantic?
+
+Pydantic is used for:
+
+- Request validation
+- Tool arguments
+- LLM structured outputs
+- Configuration
+- API schemas
+- Internal data contracts
+
+Example:
+
+```python
+class AddToCart(BaseModel):
+    product_id: str
+    quantity: int
+    customizations: list[str] = []
+```
+
+This prevents malformed tool calls from reaching business systems.
+
+---
+
+# 18. Tool Architecture
+
+Tools are the controlled interface between the AI and the application.
+
+Generic tools may include:
+
+```text
+search_catalog()
+get_product()
+check_availability()
+
+create_cart()
 get_cart()
+add_to_cart()
+update_cart()
+remove_from_cart()
 
-calculate_order_total()
-
-apply_coupon(code)
+calculate_total()
 
 create_order()
+get_order_status()
+cancel_order()
 
-get_order_status(order_id)
-
-cancel_order(order_id)
-
+search_knowledge()
 transfer_to_human()
 ```
 
-The LLM does **not directly modify the database**.
+The exact tools exposed depend on the business capabilities.
 
-Instead:
+---
+
+# 19. Capability System
+
+Businesses declare capabilities.
+
+Example:
+
+```yaml
+capabilities:
+  - catalog
+  - cart
+  - ordering
+  - delivery
+  - order_tracking
+```
+
+A salon might use:
+
+```yaml
+capabilities:
+  - services
+  - availability
+  - appointment_booking
+  - appointment_rescheduling
+  - appointment_cancellation
+```
+
+The agent should only have access to tools supported by the current business.
+
+This reduces:
+
+- Tool confusion
+- Invalid actions
+- Prompt complexity
+- Unnecessary tool calls
+
+---
+
+# 20. Business Adapter Layer
+
+The adapter pattern isolates external business systems from the agent.
+
+Interface:
+
+```python
+class BusinessAdapter(Protocol):
+
+    async def search_catalog(self, query: str):
+        ...
+
+    async def get_product(self, product_id: str):
+        ...
+
+    async def check_availability(self, product_id: str):
+        ...
+
+    async def create_transaction(self, data):
+        ...
+
+    async def get_status(self, transaction_id: str):
+        ...
+```
+
+A restaurant implementation may connect to:
 
 ```text
+Restaurant POS
+Restaurant API
+PostgreSQL
+```
+
+A future e-commerce implementation could connect to:
+
+```text
+Shopify
+Custom Commerce API
+```
+
+The agent does not need to know the difference.
+
+---
+
+# 21. Why Adapter Pattern?
+
+The Adapter pattern is intentionally used here.
+
+Without adapters:
+
+```text
+Agent
+ ├── Restaurant logic
+ ├── Salon logic
+ ├── Hotel logic
+ └── E-commerce logic
+```
+
+This becomes tightly coupled.
+
+With adapters:
+
+```text
+Agent
+  │
+  ▼
+Business Interface
+  │
+  ├── RestaurantAdapter
+  ├── SalonAdapter
+  ├── HotelAdapter
+  └── EcommerceAdapter
+```
+
+The core agent remains stable.
+
+---
+
+# 22. Restaurant Reference Implementation
+
+The first business implementation is restaurant food ordering.
+
+Capabilities:
+
+```text
+catalog
+menu_search
+availability
+cart
+customization
+ordering
+delivery
+pickup
+order_tracking
+cancellation
+```
+
+Example workflow:
+
+```text
+Customer
+   │
+   ▼
+"What burgers do you have?"
+   │
+   ▼
+Catalog Search
+   │
+   ▼
+"Add two chicken burgers."
+   │
+   ▼
+Availability Check
+   │
+   ▼
+Cart
+   │
+   ▼
+Customization
+   │
+   ▼
+Total Calculation
+   │
+   ▼
+Customer Confirmation
+   │
+   ▼
+Create Order
+```
+
+Restaurant-specific behavior lives inside the restaurant adapter/configuration.
+
+---
+
+# 23. Why PostgreSQL?
+
+PostgreSQL stores authoritative transactional data.
+
+Examples:
+
+```text
+Businesses
+Customers
+Products
+Categories
+Orders
+Order Items
+Transactions
+Payments
+Events
+```
+
+PostgreSQL is preferred because ordering workflows require:
+
+- ACID transactions
+- Relationships
+- Constraints
+- Indexing
+- Reliable updates
+- Strong consistency
+
+An LLM must never be the source of truth for transactional information.
+
+---
+
+# 24. Why SQLAlchemy?
+
+SQLAlchemy provides:
+
+- Database abstraction
+- ORM support
+- Query construction
+- Transactions
+- Connection pooling
+
+It also keeps business logic independent from raw SQL where appropriate.
+
+---
+
+# 25. Why Alembic?
+
+Alembic manages database schema migrations.
+
+Example:
+
+```text
+Migration 001
+Create businesses
+
+Migration 002
+Create products
+
+Migration 003
+Create orders
+
+Migration 004
+Add order events
+```
+
+Production systems should not depend on manually modifying database schemas.
+
+---
+
+# 26. Why Redis?
+
+Redis is used for fast, temporary data.
+
+Potential use cases:
+
+```text
+Session state
+Conversation metadata
+Caching
+Rate limiting
+Distributed locks
+Short-lived workflow state
+```
+
+Redis is not the authoritative order database.
+
+PostgreSQL remains the source of truth.
+
+---
+
+# 27. Why Qdrant?
+
+Qdrant is used for semantic retrieval.
+
+Good candidates for vector search:
+
+```text
+FAQs
+Policies
+Product descriptions
+Business information
+Unstructured documentation
+Dietary information
+Customer-support knowledge
+```
+
+Structured transactional data should remain in PostgreSQL.
+
+Therefore:
+
+```text
+Structured facts → PostgreSQL
+Semantic knowledge → Qdrant
+```
+
+---
+
+# 28. RAG Architecture
+
+```text
+Documents
+    │
+    ▼
+Parsing
+    │
+    ▼
+Chunking
+    │
+    ▼
+Embeddings
+    │
+    ▼
+Qdrant
+    │
+    ▼
+Metadata Filtering
+    │
+    ▼
+Top-K Retrieval
+    │
+    ▼
+Reranking
+    │
+    ▼
+Context Selection
+    │
+    ▼
 LLM
- │
- ▼
-Structured Tool Call
- │
- ▼
-Validation
- │
- ▼
-Backend API
- │
- ▼
-Database
-```
-
-This provides better control, validation, and reliability.
-
----
-
-# 🔄 Order Flow
-
-```text
-Customer starts conversation
-            │
-            ▼
-      Understand intent
-            │
-            ▼
-       Search menu
-            │
-            ▼
-    Check availability
-            │
-            ▼
-     Add items to cart
-            │
-            ▼
-  Handle customizations
-            │
-            ▼
-      Review cart
-            │
-            ▼
-   Calculate final price
-            │
-            ▼
- Collect delivery / pickup details
-            │
-            ▼
-      Confirm order
-            │
-            ▼
-       Create order
-            │
-            ▼
-      Order ID generated
-            │
-            ▼
-     Confirmation to user
 ```
 
 ---
 
-# 🧩 Agent State
+# 29. RAG Metadata
 
-The agent maintains structured state throughout the conversation.
+Every document should contain business identity.
 
 Example:
 
 ```json
 {
-  "customer": {
-    "name": "Rahul",
-    "phone": "XXXXXXXXXX"
-  },
-  "order_type": "delivery",
-  "cart": [
-    {
-      "item": "Chicken Burger",
-      "quantity": 2,
-      "customizations": ["No onions", "Extra cheese"]
-    }
-  ],
-  "delivery_address": "...",
-  "subtotal": 400,
-  "delivery_fee": 40,
-  "tax": 22,
-  "total": 462,
-  "order_status": "awaiting_confirmation"
+  "business_id": "restaurant_001",
+  "document_type": "menu",
+  "category": "burgers",
+  "product_id": "burger_123"
 }
 ```
 
-The state is controlled by the application rather than relying entirely on the LLM's conversational memory.
+This prevents information from one business being retrieved for another.
+
+Multi-tenant isolation is a fundamental requirement.
 
 ---
 
-# ⚡ Real-Time Voice Pipeline
+# 30. Structured Data vs RAG
 
-The system is designed around streaming rather than waiting for an entire conversation turn to finish.
+The system should not use RAG for everything.
+
+### Use PostgreSQL/API for:
 
 ```text
-Customer Speech
-      │
-      ▼
- Audio Stream
-      │
-      ▼
-     VAD
-      │
-      ▼
- Streaming STT
-      │
-      ▼
- Partial Transcript
-      │
-      ▼
- LangGraph / LLM
-      │
-      ▼
- Streaming Response
-      │
-      ▼
- Streaming TTS
-      │
-      ▼
- Audio Stream
-      │
-      ▼
- Customer
+Current price
+Inventory
+Availability
+Order status
+Customer data
+Cart
+Order creation
 ```
 
-The objective is to reduce perceived latency and make the conversation feel natural.
-
----
-
-# ⏱️ Latency Engineering
-
-Latency is one of the primary engineering goals of DineVoice.
-
-Important measurements include:
-
-| Metric                      | Target |
-| --------------------------- | -----: |
-| STT latency                 |    TBD |
-| LLM Time To First Token     |    TBD |
-| TTS Time To First Audio     |    TBD |
-| End-to-End Response Latency |    TBD |
-| Tool Execution Latency      |    TBD |
-| First Audio Response        |    TBD |
-
-Actual benchmark values will be added after implementation and testing.
-
----
-
-# 🚀 Latency Optimization
-
-Potential optimization techniques:
-
-### Streaming
-
-Stream:
-
-- Audio input
-- STT output
-- LLM tokens
-- TTS audio
-
-instead of waiting for complete responses.
-
-### Model Selection
-
-Compare different models based on:
-
-- Latency
-- Accuracy
-- Cost
-- Context length
-- Tool-calling reliability
-
-### Prompt Optimization
-
-Reduce unnecessary:
-
-- System prompt size
-- Retrieved context
-- Tool descriptions
-- Conversation history
-
-### Retrieval Optimization
-
-Use:
-
-- Metadata filtering
-- Top-K tuning
-- Reranking
-- Context compression
-
-### Inference Optimization
-
-For self-hosted models, experiment with:
-
-- FP16
-- BF16
-- INT8
-- INT4
-- KV cache
-- Continuous batching
-- vLLM
-
----
-
-# 🤖 Model Benchmarking
-
-Different model configurations can be compared.
+### Use RAG for:
 
 ```text
-                    Model Benchmark
-                          │
-        ┌─────────────────┼─────────────────┐
-        │                 │                 │
-      Quality           Latency            Cost
-        │                 │                 │
-        ▼                 ▼                 ▼
-   Tool accuracy      TTFT / E2E       Cost / call
-   Order accuracy     P50/P95          Cost / session
-   RAG accuracy       TTFB             Monthly estimate
+FAQs
+Policies
+Descriptions
+Business information
+Unstructured documents
 ```
 
-Example benchmark table:
-
-| Model   | Tool Accuracy | TTFT | E2E Latency | Cost/Call |
-| ------- | ------------: | ---: | ----------: | --------: |
-| Model A |           TBD |  TBD |         TBD |       TBD |
-| Model B |           TBD |  TBD |         TBD |       TBD |
-| Model C |           TBD |  TBD |         TBD |       TBD |
-
-Only measured results will be documented here.
+This distinction improves correctness.
 
 ---
 
-# 📊 RAG Evaluation
+# 31. LLM Responsibilities
 
-The RAG system will be evaluated independently.
-
-Metrics may include:
-
-- Retrieval precision
-- Retrieval recall
-- Hit@K
-- MRR
-- Context relevance
-- Answer faithfulness
-- Groundedness
-- Hallucination rate
-
-Example evaluation flow:
+The LLM is responsible for:
 
 ```text
-Question
-   │
-   ▼
-Retriever
-   │
-   ▼
-Retrieved Documents
-   │
-   ▼
-Reranker
-   │
-   ▼
-LLM
-   │
-   ▼
-Generated Answer
-   │
-   ▼
-Evaluation
+Intent understanding
+Natural language interpretation
+Clarification
+Tool selection
+Response generation
+Conversation reasoning
+```
+
+The LLM is NOT responsible for:
+
+```text
+Pricing
+Inventory truth
+Order persistence
+Payment authorization
+Database integrity
+Business authorization
 ```
 
 ---
 
-# 🔧 Agent Evaluation
+# 32. Deterministic Business Logic
 
-The agent will also be evaluated on its ability to correctly execute restaurant workflows.
+Critical calculations should be deterministic.
 
-Important evaluation cases:
-
-### Intent Detection
+Example:
 
 ```text
-"Show me vegetarian options"
-→ MENU_SEARCH
+Cart
+ │
+ ▼
+Backend
+ │
+ ├── Item price
+ ├── Quantity
+ ├── Discounts
+ ├── Tax
+ └── Delivery fee
+ │
+ ▼
+Final Total
 ```
 
-```text
-"I want to order two pizzas"
-→ CREATE_ORDER
+Never ask the LLM:
+
+> "Calculate the final order price."
+
+Instead:
+
+```python
+calculate_order_total(cart_id)
 ```
 
-```text
-"Where is my order?"
-→ ORDER_STATUS
-```
+The backend returns the authoritative result.
 
-### Tool Selection
+---
 
-Measure whether the correct tool is selected.
+# 33. Order Safety
 
-### Tool Arguments
+Order creation requires explicit confirmation.
 
-Verify:
-
-- Item ID
-- Quantity
-- Customizations
-- Order ID
-- Customer information
-
-### Workflow Correctness
-
-Verify that the agent follows the correct sequence.
-
-For example:
+Preferred flow:
 
 ```text
-Search Item
-      ↓
-Check Availability
-      ↓
-Add To Cart
-      ↓
+Customer Request
+      │
+      ▼
+Build Cart
+      │
+      ▼
 Calculate Total
-      ↓
-Confirm
-      ↓
+      │
+      ▼
+Read Back Order
+      │
+      ▼
+Explicit Confirmation
+      │
+      ▼
 Create Order
 ```
 
-The agent should not skip critical validation steps.
+The system should prevent accidental order creation from ambiguous language.
 
 ---
 
-# 🛡️ Reliability & Safety
+# 34. Idempotency
 
-Food ordering requires deterministic backend validation.
+Order creation must be idempotent.
 
-The system should protect against:
-
-- Invalid item IDs
-- Incorrect quantities
-- Unavailable items
-- Incorrect prices
-- Invalid coupons
-- Duplicate orders
-- Incorrect totals
-- Invalid delivery addresses
-- Accidental order creation
-
-### Important Principle
-
-> The LLM can decide **what it wants to do**, but the backend decides **what is actually allowed**.
-
-For example:
+If a network failure occurs:
 
 ```text
-LLM:
-"Add 5 Chicken Burgers"
+AI → create_order()
+       │
+       ▼
+Backend creates order
+       │
+       X
+Response lost
+```
 
+The agent may retry.
+
+Without idempotency:
+
+```text
+Two orders
+```
+
+With idempotency:
+
+```text
+Same idempotency key
         ↓
+Existing order returned
+```
 
-Backend Validation
+This is essential for production reliability.
 
+---
+
+# 35. Error Handling
+
+Errors should be classified.
+
+```text
+Transient
+    ↓
+Retry
+
+Validation
+    ↓
+Ask user / correct input
+
+Business
+    ↓
+Explain constraint
+
+System
+    ↓
+Fallback / human handoff
+```
+
+Example:
+
+```text
+Payment service unavailable
         ↓
-
-Is item available?
-Is quantity valid?
-Is customization valid?
-Is price current?
-
+Do not create duplicate order
         ↓
-
-Database Operation
+Inform customer
+        ↓
+Offer supported fallback
 ```
 
 ---
 
-# 💳 Payment Architecture
+# 36. Human Handoff
 
-The initial version can support:
+Human handoff is part of the architecture, not an afterthought.
+
+Triggers:
 
 ```text
-Cash on Delivery
-Online Payment
-Pay at Pickup
+Explicit customer request
+Low confidence
+Repeated misunderstanding
+Unsupported workflow
+Payment issue
+Complex complaint
+Business-defined escalation
 ```
 
-For online payment, the architecture should avoid allowing the LLM to directly handle payment credentials.
+The human should receive:
+
+```text
+Customer
+Current conversation summary
+Current cart/order
+Detected intent
+Failure reason
+Relevant tool results
+```
+
+---
+
+# 37. Authentication & Authorization
+
+The backend must distinguish:
+
+```text
+Customer
+Business Admin
+System Agent
+Internal Services
+```
+
+Business APIs should be scoped to the correct:
+
+```text
+business_id
+customer_id
+session_id
+```
+
+The AI agent should never be allowed to arbitrarily access another business's data.
+
+---
+
+# 38. Multi-Tenant Architecture
+
+VoiceOS is conceptually multi-tenant.
+
+Every business-owned resource should be associated with:
+
+```text
+business_id
+```
+
+Example:
+
+```text
+business_id
+    │
+    ├── configuration
+    ├── capabilities
+    ├── knowledge base
+    ├── catalog
+    ├── customers
+    └── orders
+```
+
+This allows the same platform to serve multiple businesses.
+
+---
+
+# 39. Configuration Architecture
+
+Example:
+
+```text
+config/
+├── platform.yaml
+├── businesses/
+│   ├── restaurant_001.yaml
+│   ├── salon_001.yaml
+│   └── hotel_001.yaml
+└── prompts/
+    ├── base.yaml
+    └── business/
+```
+
+Business configuration may contain:
+
+```yaml
+business:
+  id: restaurant_001
+  type: restaurant
+  name: ABC Restaurant
+
+voice:
+  language: en-IN
+  tone: friendly
+
+capabilities:
+  - catalog
+  - ordering
+  - delivery
+  - pickup
+  - tracking
+
+policies:
+  require_order_confirmation: true
+  allow_cancellation: true
+```
+
+---
+
+# 40. Prompt Architecture
+
+Prompts should be layered.
+
+```text
+Base System Prompt
+        │
+        ▼
+Platform Rules
+        │
+        ▼
+Business Context
+        │
+        ▼
+Capability Instructions
+        │
+        ▼
+Current Workflow
+```
+
+The core system prompt should not contain restaurant-specific instructions.
+
+---
+
+# 41. Why Not Hardcode Prompts Per Business?
+
+Hardcoding:
+
+```text
+You are a restaurant ordering assistant...
+```
+
+makes reuse difficult.
 
 Instead:
 
 ```text
-Customer
-   │
-   ▼
-AI Agent
-   │
-   ▼
-Create Pending Order
-   │
-   ▼
-Payment Gateway
-   │
-   ▼
-Payment Confirmation
-   │
-   ▼
-Order Confirmed
+You are the voice assistant for {{business.name}}.
+
+Your available capabilities are:
+{{capabilities}}
+
+Follow these business rules:
+{{policies}}
 ```
 
-Sensitive payment information should be handled by the payment provider rather than the LLM.
+This allows business configuration to influence behavior without rewriting the agent.
 
 ---
 
-# 👤 Human Handoff
+# 42. Model Strategy
 
-The agent should be able to transfer a conversation to a restaurant employee.
+The architecture should not be tied permanently to one LLM provider.
 
-Possible triggers:
+Create an abstraction:
 
 ```text
-Customer requests human
-        OR
-Low confidence
-        OR
-Complex complaint
-        OR
-Payment failure
-        OR
-Unsupported request
+LLM Interface
+     │
+     ├── OpenAI
+     ├── Gemini
+     ├── Anthropic
+     └── Open-source
 ```
 
-Before transferring, the system can provide the human agent with:
+This allows benchmarking.
+
+Compare:
 
 ```text
-Customer
-Current cart
-Order ID
-Conversation summary
-Issue
-Previous tool calls
+Accuracy
+Tool-calling reliability
+TTFT
+Latency
+Cost
+Context handling
 ```
 
 ---
 
-# 🧪 Testing
+# 43. Why API + Open-Source Models?
 
-## Unit Testing
+API models provide:
 
-- Tool functions
-- Cart calculations
-- Order validation
-- API endpoints
-- RAG components
-- State transitions
+- Strong quality
+- Easy deployment
+- Fast experimentation
 
-Technology:
+Open-source models provide:
 
-```text
-Pytest
-```
+- Deployment control
+- Cost optimization opportunities
+- Fine-tuning
+- Quantization
+- GPU inference experience
+
+Using both makes the project more valuable as an AI engineering portfolio.
 
 ---
 
-## Integration Testing
+# 44. Model Serving — vLLM
 
-Test complete workflows:
+vLLM is used for experimentation with self-hosted LLM inference.
+
+Potential architecture:
 
 ```text
-Voice
- ↓
-STT
- ↓
+FastAPI
+   │
+   ▼
 Agent
- ↓
-Tool
- ↓
-Database
- ↓
-TTS
+   │
+   ▼
+LLM Interface
+   │
+   ▼
+vLLM
+   │
+   ▼
+GPU
+```
+
+Areas to benchmark:
+
+- Throughput
+- TTFT
+- Concurrent requests
+- GPU memory
+- Token generation speed
+
+We should use existing optimized implementations rather than attempting to implement low-level GPU kernels ourselves.
+
+---
+
+# 45. Quantization
+
+For self-hosted models, evaluate:
+
+```text
+FP16
+BF16
+INT8
+INT4
+```
+
+Compare:
+
+```text
+Quality
+Latency
+GPU memory
+Throughput
+Cost
+```
+
+The objective is to understand the trade-off between model quality and infrastructure efficiency.
+
+---
+
+# 46. Fine-Tuning
+
+Fine-tuning is optional for the initial platform.
+
+If implemented, focus on a narrowly defined task such as:
+
+```text
+Intent classification
+Structured order extraction
+Tool selection
+```
+
+Potential stack:
+
+```text
+PyTorch
+Hugging Face Transformers
+PEFT
+LoRA
+QLoRA
+```
+
+Fine-tuning should only be introduced when evaluation demonstrates that prompting or model selection is insufficient.
+
+---
+
+# 47. Evaluation Architecture
+
+Evaluation is a first-class component.
+
+```text
+Test Dataset
+     │
+     ▼
+Agent
+     │
+     ▼
+Trace
+     │
+     ▼
+Evaluators
+     │
+ ┌───┼───────────────┐
+ ▼   ▼               ▼
+RAG Tool           Workflow
+Eval Eval          Eval
+ │   │               │
+ └───┼───────────────┘
+     ▼
+Evaluation Report
 ```
 
 ---
 
-## Load Testing
+# 48. Evaluation Categories
 
-Use:
+## Voice
 
-```text
-Locust
+- STT accuracy
+- Turn detection
+- Interruption handling
+- Time to first audio
+- End-to-end latency
+
+## Agent
+
+- Intent accuracy
+- Tool selection accuracy
+- Tool argument accuracy
+- Workflow completion
+- Recovery behavior
+
+## RAG
+
+- Recall@K
+- Precision@K
+- MRR
+- Context relevance
+- Groundedness
+
+## Transactional
+
+- Cart correctness
+- Price correctness
+- Order correctness
+- Duplicate order rate
+
+---
+
+# 49. Golden Dataset
+
+Create a deterministic evaluation dataset.
+
+Example:
+
+```json
+{
+  "input": "I want two chicken burgers without onions",
+  "expected_intent": "add_to_cart",
+  "expected_tool": "add_to_cart",
+  "expected_arguments": {
+    "quantity": 2,
+    "customizations": ["no onions"]
+  }
+}
 ```
 
-Test progressively:
+The dataset should include:
+
+- Normal requests
+- Ambiguous requests
+- Corrections
+- Interruptions
+- Invalid requests
+- Multi-turn conversations
+- Edge cases
+
+---
+
+# 50. Observability
+
+Every conversation should produce a trace.
+
+Example:
 
 ```text
-1 concurrent call
-       ↓
-10 concurrent calls
-       ↓
-50 concurrent calls
-       ↓
-100 concurrent calls
-       ↓
-500+ concurrent calls
+Trace ID
+ │
+ ├── STT latency
+ │
+ ├── Intent detection
+ │
+ ├── Retrieval
+ │
+ ├── LLM request
+ │
+ ├── Tool call
+ │
+ ├── Database query
+ │
+ ├── TTS latency
+ │
+ └── Final response
+```
+
+---
+
+# 51. OpenTelemetry
+
+OpenTelemetry provides standardized telemetry.
+
+Use it for:
+
+- Traces
+- Metrics
+- Correlation IDs
+- Service-level visibility
+
+A single voice request should be traceable across:
+
+```text
+LiveKit
+ → API
+ → Agent
+ → RAG
+ → PostgreSQL
+ → External API
+ → TTS
+```
+
+---
+
+# 52. AWS
+
+AWS is the target production cloud.
+
+Initial deployment may use:
+
+```text
+AWS
+ │
+ ├── ECS / EC2
+ ├── Application Load Balancer
+ ├── RDS PostgreSQL
+ ├── ElastiCache Redis
+ ├── S3
+ ├── CloudWatch
+ └── IAM
+```
+
+The exact deployment topology may evolve based on load-testing results.
+
+---
+
+# 53. Why Docker?
+
+Every service should be reproducible.
+
+Docker provides:
+
+```text
+Development consistency
+Testing consistency
+Production consistency
+Isolation
+Easy deployment
+```
+
+Example:
+
+```text
+API container
+Worker container
+Evaluation container
+PostgreSQL
+Redis
+Qdrant
+```
+
+---
+
+# 54. Load Testing
+
+Locust will simulate concurrent users.
+
+Test progression:
+
+```text
+1
+10
+50
+100
+500
+...
 ```
 
 Measure:
 
-- Requests/sec
-- Concurrent sessions
-- P50 latency
-- P95 latency
-- P99 latency
-- Error rate
-- CPU utilization
-- RAM usage
-- GPU utilization
-- Database latency
-- Model throughput
-
-Actual capacity numbers will be documented only after real load testing.
-
----
-
-# 📈 Observability
-
-The system should provide visibility into every important stage.
-
 ```text
-Call
- │
- ├── STT
- │
- ├── Agent
- │    ├── Intent
- │    ├── Retrieval
- │    ├── Tool Selection
- │    └── Tool Execution
- │
- ├── Database
- │
- └── TTS
+P50
+P95
+P99
+
+Error rate
+Throughput
+CPU
+Memory
+GPU
+Database latency
 ```
 
-Track:
-
-- Request ID
-- Call/session ID
-- User intent
-- Tool calls
-- Tool latency
-- LLM latency
-- STT latency
-- TTS latency
-- Retrieval latency
-- Errors
-- Fallbacks
-- Human handoffs
-
-Technologies:
-
-- Structured logging
-- OpenTelemetry
-- CloudWatch
-- Metrics
-- Distributed tracing
+We will never publish estimated numbers as actual benchmark results.
 
 ---
 
-# ☁️ AWS Deployment
+# 55. Performance Budget
 
-Target deployment architecture:
+Latency should be treated as a measurable engineering constraint.
 
 ```text
-                    Internet
-                       │
-                       ▼
-                 AWS Load Balancer
-                       │
-                       ▼
-                FastAPI Application
-                       │
-          ┌────────────┼────────────┐
-          │            │            │
-          ▼            ▼            ▼
-      LangGraph      Redis       PostgreSQL
-          │
-          ▼
-        Qdrant
-          │
-          ▼
-      LLM Service
-          │
-          ▼
-      Voice Services
+User stops speaking
+        │
+        ▼
+STT
+        │
+        ▼
+Agent
+        │
+        ▼
+Tool / RAG
+        │
+        ▼
+LLM
+        │
+        ▼
+TTS
+        │
+        ▼
+First audio
 ```
 
-Potential AWS services:
+Each stage gets independently measured.
 
-- EC2
-- ECS
-- S3
-- Application Load Balancer
-- CloudWatch
-- IAM
-- VPC
-- Redis
-- PostgreSQL
-
-Docker will be used to package application components.
+This allows us to identify the real bottleneck instead of optimizing blindly.
 
 ---
 
-# 🐳 Containerization
+# 56. Caching Strategy
 
-Example services:
+Potential caching layers:
 
 ```text
-docker-compose.yml
-
-services:
-
-  api
-  worker
-  postgres
-  redis
-  qdrant
-  monitoring
+Redis
+ │
+ ├── Frequently requested business information
+ ├── Menu metadata
+ ├── Configuration
+ └── Short-lived session data
 ```
 
-The architecture should allow individual services to be scaled independently where required.
+Do not cache data where stale information could cause incorrect transactions unless appropriate invalidation is implemented.
+
+For example:
+
+```text
+Current inventory
+Current price
+Order status
+```
+
+should have stricter freshness requirements than:
+
+```text
+Restaurant description
+FAQ
+Opening-hour documentation
+```
 
 ---
 
-# 📁 Project Structure
+# 57. Reliability Principles
+
+The platform follows these principles:
+
+### Principle 1
+
+**LLM output is untrusted input.**
+
+Validate it.
+
+### Principle 2
+
+**Database is the source of truth.**
+
+Not the LLM.
+
+### Principle 3
+
+**Critical actions require deterministic validation.**
+
+### Principle 4
+
+**Every external operation can fail.**
+
+Handle retries and timeouts.
+
+### Principle 5
+
+**Retries must be safe.**
+
+Use idempotency.
+
+### Principle 6
+
+**The customer should always have a recovery path.**
+
+Human handoff is part of reliability.
+
+---
+
+# 58. Security Principles
+
+The system should protect:
+
+- Customer data
+- Business data
+- API credentials
+- Payment information
+- Authentication tokens
+- Internal system details
+
+Never expose:
 
 ```text
-dinevoice/
+API keys
+Database credentials
+Internal prompts
+System architecture secrets
+Private customer information
+```
+
+through the voice response.
+
+---
+
+# 59. Secrets Management
+
+Secrets should never be committed to Git.
+
+Development:
+
+```text
+.env
+```
+
+Production:
+
+```text
+AWS Secrets Manager
+```
+
+Potential secrets:
+
+```text
+LLM API keys
+LiveKit credentials
+Database credentials
+Redis credentials
+External business API credentials
+```
+
+---
+
+# 60. Project Structure
+
+```text
+voiceos/
 │
 ├── app/
+│   │
 │   ├── api/
 │   │   ├── routes/
 │   │   └── dependencies/
 │   │
 │   ├── agent/
-│   │   ├── graph.py
-│   │   ├── state.py
+│   │   ├── graph/
+│   │   ├── state/
 │   │   ├── nodes/
+│   │   ├── prompts/
 │   │   └── tools/
 │   │
 │   ├── voice/
+│   │   ├── livekit/
 │   │   ├── stt/
 │   │   ├── tts/
 │   │   ├── vad/
-│   │   └── livekit/
+│   │   └── interruption/
+│   │
+│   ├── capabilities/
+│   │   ├── catalog/
+│   │   ├── cart/
+│   │   ├── ordering/
+│   │   ├── booking/
+│   │   ├── tracking/
+│   │   └── cancellation/
+│   │
+│   ├── businesses/
+│   │   ├── base/
+│   │   ├── restaurant/
+│   │   ├── salon/
+│   │   └── adapters/
 │   │
 │   ├── rag/
 │   │   ├── ingestion/
+│   │   ├── chunking/
+│   │   ├── embeddings/
 │   │   ├── retrieval/
-│   │   ├── reranking/
-│   │   └── embeddings/
+│   │   └── reranking/
 │   │
-│   ├── ordering/
-│   │   ├── cart.py
-│   │   ├── orders.py
-│   │   └── validation.py
+│   ├── llm/
+│   │   ├── interface.py
+│   │   ├── providers/
+│   │   └── routing/
 │   │
-│   ├── models/
 │   ├── database/
+│   │   ├── models/
+│   │   ├── repositories/
+│   │   └── migrations/
+│   │
 │   ├── services/
+│   │   ├── orders/
+│   │   ├── customers/
+│   │   └── businesses/
+│   │
+│   ├── observability/
+│   │   ├── logging/
+│   │   ├── tracing/
+│   │   └── metrics/
+│   │
 │   └── config/
+│
+├── evaluation/
+│   ├── datasets/
+│   ├── runners/
+│   ├── evaluators/
+│   └── reports/
+│
+├── benchmarks/
+│   ├── latency/
+│   ├── models/
+│   ├── inference/
+│   └── load/
 │
 ├── tests/
 │   ├── unit/
 │   ├── integration/
-│   ├── evaluation/
+│   ├── e2e/
 │   └── load/
 │
-├── scripts/
-│   ├── ingestion/
-│   ├── benchmarking/
-│   └── evaluation/
+├── businesses/
+│   └── restaurant_001/
+│       ├── config.yaml
+│       └── knowledge/
 │
-├── docker/
+├── infrastructure/
+│   ├── docker/
+│   └── aws/
+│
+├── scripts/
 │
 ├── docs/
-│   ├── architecture.md
-│   ├── evaluation.md
-│   └── benchmarks.md
 │
 ├── Dockerfile
 ├── docker-compose.yml
-├── requirements.txt
+├── pyproject.toml
 └── README.md
 ```
 
 ---
 
-# 🗄️ Database
+# 61. Request Lifecycle
 
-### PostgreSQL
-
-Potential tables:
+A complete voice interaction should follow this conceptual flow:
 
 ```text
-restaurants
-menu_categories
-menu_items
-item_customizations
-customers
-carts
-cart_items
-orders
-order_items
-payments
-order_events
-```
-
-Example order lifecycle:
-
-```text
-CART
-  ↓
-PENDING_CONFIRMATION
-  ↓
-CONFIRMED
-  ↓
-PREPARING
-  ↓
-READY
-  ↓
-OUT_FOR_DELIVERY
-  ↓
-DELIVERED
+Customer speaks
+       │
+       ▼
+LiveKit
+       │
+       ▼
+VAD
+       │
+       ▼
+Streaming STT
+       │
+       ▼
+Conversation Manager
+       │
+       ▼
+LangGraph
+       │
+       ├──────────────┐
+       │              │
+       ▼              ▼
+      RAG           Tools
+       │              │
+       │              ▼
+       │        Capability Layer
+       │              │
+       │              ▼
+       │        Business Adapter
+       │              │
+       │              ▼
+       │        External System
+       │
+       └──────┬───────┘
+              ▼
+             LLM
+              │
+              ▼
+          Response
+              │
+              ▼
+          Streaming TTS
+              │
+              ▼
+           LiveKit
+              │
+              ▼
+          Customer
 ```
 
 ---
 
-# 🔎 Vector Database
+# 62. Example: Restaurant
 
-Qdrant will store embeddings for unstructured restaurant information.
+Business configuration:
 
-Example metadata:
+```yaml
+business:
+  type: restaurant
 
-```json
-{
-  "restaurant_id": "restaurant_123",
-  "category": "menu",
-  "item_id": "burger_42",
-  "dietary_type": "vegetarian"
-}
+capabilities:
+  - catalog
+  - cart
+  - ordering
+  - delivery
+  - pickup
+  - tracking
+  - cancellation
 ```
 
-Metadata filtering allows the agent to retrieve information specific to the correct restaurant or menu category.
+Customer:
 
----
+> "I want two chicken burgers, one without onions."
 
-# 🧠 Model Engineering
-
-The project can include experiments with open-source models.
-
-Potential technologies:
-
-- Hugging Face Transformers
-- PyTorch
-- PEFT
-- LoRA
-- QLoRA
-- Quantization
-- FP16
-- BF16
-- INT8
-- INT4
-- vLLM
-
-The goal is to understand the complete path:
+Agent:
 
 ```text
-Model
+Intent
   ↓
-Fine-tuning
+ADD_TO_CART
   ↓
-Quantization
+search_catalog()
   ↓
-Model Serving
+get_product()
   ↓
-Inference
+check_availability()
   ↓
-Latency / Throughput
-  ↓
-Production
+add_to_cart()
+```
+
+Then:
+
+```text
+calculate_total()
+       ↓
+read cart
+       ↓
+customer confirmation
+       ↓
+create_order()
 ```
 
 ---
 
-# 🔬 Fine-Tuning Experiment
+# 63. Example: Salon
 
-A small domain-specific fine-tuning experiment may be added for tasks such as:
+No core agent rewrite should be required.
 
-- Restaurant intent classification
-- Tool selection
-- Structured order extraction
-- Food customization extraction
+Configuration:
+
+```yaml
+business:
+  type: salon
+
+capabilities:
+  - services
+  - availability
+  - appointment_booking
+  - appointment_rescheduling
+  - cancellation
+```
+
+Conversation:
+
+> "I'd like a haircut tomorrow afternoon."
+
+Agent:
+
+```text
+Intent
+  ↓
+BOOK_APPOINTMENT
+  ↓
+search_services()
+  ↓
+check_availability()
+  ↓
+confirm_time()
+  ↓
+create_booking()
+```
+
+Same:
+
+```text
+Voice
+STT
+LangGraph
+RAG
+Observability
+Evaluation
+```
+
+Different:
+
+```text
+Capabilities
+Business Adapter
+Knowledge
+Configuration
+```
+
+This proves the architecture is genuinely reusable.
+
+---
+
+# 64. Example: E-commerce
+
+Configuration:
+
+```yaml
+business:
+  type: ecommerce
+
+capabilities:
+  - catalog
+  - cart
+  - ordering
+  - shipping
+  - order_tracking
+  - cancellation
+```
+
+The same platform could handle:
+
+> "Do you have the 32GB model?"
+
+> "Add it to my cart."
+
+> "What's the delivery time to Delhi?"
+
+> "Place the order."
+
+Again, only business-specific integrations change.
+
+---
+
+# 65. Design Patterns
+
+The project intentionally uses several software engineering patterns.
+
+## Adapter
+
+Used for:
+
+```text
+Business integrations
+External APIs
+LLM providers
+```
+
+## Strategy
+
+Used for:
+
+```text
+LLM selection
+Retrieval strategies
+STT/TTS providers
+```
 
 Example:
 
 ```text
-Customer:
-"Give me two paneer pizzas, one without onions."
-
-        ↓
-
-Model
-
-        ↓
-
-{
-  "items": [
-    {
-      "name": "paneer pizza",
-      "quantity": 2,
-      "customizations": [
-        "no onions"
-      ]
-    }
-  ]
-}
+LLMStrategy
+ ├── OpenAI
+ ├── Gemini
+ └── LocalModel
 ```
 
-The experiment will compare:
+## Factory
+
+Used for:
 
 ```text
-Base Model
-     vs
-Fine-Tuned Model
+Creating business adapters
+Creating model clients
+Creating provider implementations
 ```
 
-using accuracy, latency, and reliability metrics.
+## State
+
+Implemented naturally through:
+
+```text
+LangGraph
+```
+
+Used for:
+
+```text
+Conversation state
+Order workflow
+Agent execution
+```
+
+## Repository
+
+Used to separate:
+
+```text
+Business logic
+     ↓
+Database access
+```
+
+These patterns should be used where they solve an actual architectural problem, not merely to demonstrate design patterns.
 
 ---
 
-# ⚙️ Performance Engineering
+# 66. Why Not Microservices Initially?
 
-Areas investigated:
+The first implementation should be a **modular monolith**.
 
-- Streaming inference
-- Async processing
-- Connection pooling
-- Redis caching
-- Database indexing
-- Vector search optimization
-- Reranking optimization
-- LLM prompt optimization
-- Token reduction
-- Model quantization
-- vLLM inference
-- Concurrent request handling
+```text
+One deployable application
+        │
+        ├── Agent
+        ├── Voice
+        ├── RAG
+        ├── Business
+        ├── Orders
+        └── API
+```
+
+Why?
+
+Because premature microservices introduce:
+
+- Network complexity
+- Deployment complexity
+- Distributed debugging
+- More infrastructure
+- More operational overhead
+
+The internal modules should have clean boundaries so that components can be extracted later if scale requires it.
 
 ---
 
-# 📊 Production Metrics
+# 67. Scaling Strategy
 
-The project will track:
+Initial:
+
+```text
+Modular Monolith
+```
+
+Then scale independently where necessary:
+
+```text
+Voice Workers
+      │
+      ▼
+Agent Workers
+      │
+      ▼
+API Servers
+      │
+      ▼
+PostgreSQL / Redis / Qdrant
+```
+
+If model inference becomes the bottleneck:
+
+```text
+Application
+    │
+    ▼
+Inference Service
+    │
+    ▼
+GPU Cluster
+```
+
+Architecture should evolve based on measured bottlenecks.
+
+---
+
+# 68. Development Phases
+
+## Phase 1 — Foundation
+
+Build:
+
+```text
+Python
+FastAPI
+PostgreSQL
+Docker
+Pydantic
+Configuration
+```
+
+---
+
+## Phase 2 — Voice
+
+Build:
+
+```text
+LiveKit
+VAD
+STT
+TTS
+Streaming
+Barge-in
+```
+
+---
+
+## Phase 3 — Agent
+
+Build:
+
+```text
+LangGraph
+State
+Intent routing
+Tools
+Tool validation
+Retries
+```
+
+---
+
+## Phase 4 — Restaurant
+
+Build:
+
+```text
+Menu
+Catalog
+Cart
+Customization
+Availability
+Pricing
+Ordering
+Delivery/Pickup
+Tracking
+Cancellation
+```
+
+---
+
+## Phase 5 — RAG
+
+Build:
+
+```text
+Ingestion
+Embeddings
+Qdrant
+Retrieval
+Metadata filtering
+Reranking
+Evaluation
+```
+
+---
+
+## Phase 6 — Production Engineering
+
+Build:
+
+```text
+Redis
+Caching
+Observability
+OpenTelemetry
+AWS
+Docker deployment
+Load testing
+```
+
+---
+
+## Phase 7 — Model Engineering
+
+Experiment with:
+
+```text
+Hugging Face
+Open-source LLMs
+Quantization
+LoRA
+QLoRA
+vLLM
+```
+
+Only after the core workflow works reliably.
+
+---
+
+## Phase 8 — Reusability Validation
+
+Build a second business adapter.
+
+For example:
+
+```text
+Restaurant
+      ↓
+Salon
+```
+
+The goal is to demonstrate:
+
+```text
+Same Core
+Different Business
+```
+
+without duplicating the entire application.
+
+---
+
+# 69. Definition of Done
+
+The project should not be considered complete merely because the voice agent can answer questions.
+
+A production-oriented milestone requires:
 
 ### Voice
 
-- Speech recognition accuracy
-- Time to first audio
-- End-to-end latency
-- Interruption handling
+- [ ] Streaming audio
+- [ ] Low-latency STT
+- [ ] Low-latency TTS
+- [ ] Barge-in
+- [ ] Error recovery
 
 ### Agent
 
-- Intent accuracy
-- Tool selection accuracy
-- Tool argument accuracy
-- Workflow completion rate
+- [ ] LangGraph workflow
+- [ ] Structured state
+- [ ] Tool calling
+- [ ] Validation
+- [ ] Retry logic
+- [ ] Human handoff
+
+### Business
+
+- [ ] Restaurant ordering
+- [ ] Cart
+- [ ] Customization
+- [ ] Availability
+- [ ] Pricing
+- [ ] Order creation
+- [ ] Order tracking
 
 ### RAG
 
-- Retrieval recall
-- Retrieval precision
-- Hit@K
-- MRR
-- Groundedness
-
-### Ordering
-
-- Order extraction accuracy
-- Cart accuracy
-- Price calculation accuracy
-- Order success rate
-- Duplicate order rate
-
-### Infrastructure
-
-- CPU
-- Memory
-- GPU
-- Throughput
-- P50 latency
-- P95 latency
-- P99 latency
-- Error rate
-
----
-
-# 🗺️ Development Roadmap
-
-## Phase 1 — Voice Foundation
-
-- [ ] Set up LiveKit
-- [ ] Integrate STT
-- [ ] Integrate TTS
-- [ ] Implement basic voice conversation
-- [ ] Implement VAD
-- [ ] Test streaming audio
-
----
-
-## Phase 2 — Agent
-
-- [ ] Build LangGraph workflow
-- [ ] Define agent state
-- [ ] Add intent detection
-- [ ] Add structured outputs
-- [ ] Add tool calling
-- [ ] Add retry/fallback handling
-
----
-
-## Phase 3 — Restaurant Ordering
-
-- [ ] Restaurant database
-- [ ] Menu API
-- [ ] Menu search
-- [ ] Item availability
-- [ ] Cart management
-- [ ] Customizations
-- [ ] Price calculation
-- [ ] Order creation
-- [ ] Order status
-- [ ] Cancellation
-
----
-
-## Phase 4 — RAG
-
-- [ ] Document ingestion
-- [ ] Embeddings
+- [ ] Ingestion
 - [ ] Qdrant
+- [ ] Retrieval
 - [ ] Metadata filtering
 - [ ] Reranking
-- [ ] Context compression
-- [ ] Retrieval evaluation
+- [ ] Evaluation
 
----
-
-## Phase 5 — Real-Time Optimization
-
-- [ ] Streaming STT
-- [ ] Streaming LLM
-- [ ] Streaming TTS
-- [ ] Barge-in
-- [ ] Measure TTFT
-- [ ] Measure end-to-end latency
-- [ ] Optimize prompts
-- [ ] Optimize retrieval
-
----
-
-## Phase 6 — Model Engineering
-
-- [ ] Hugging Face Transformers
-- [ ] Open-source model testing
-- [ ] Quantization
-- [ ] LoRA
-- [ ] QLoRA
-- [ ] vLLM
-- [ ] Inference benchmarking
-
----
-
-## Phase 7 — Production
+### Production
 
 - [ ] Docker
-- [ ] AWS deployment
+- [ ] AWS
 - [ ] PostgreSQL
 - [ ] Redis
-- [ ] Logging
-- [ ] Metrics
-- [ ] Tracing
-- [ ] Error handling
+- [ ] Observability
 - [ ] Load testing
-- [ ] Autoscaling
+
+### AI Engineering
+
+- [ ] Model comparison
+- [ ] Latency benchmarks
+- [ ] Agent evaluation
+- [ ] RAG evaluation
+- [ ] Inference experiment
+- [ ] Quantization experiment
+- [ ] vLLM experiment
+
+### Architecture
+
+- [ ] Business configuration
+- [ ] Capability system
+- [ ] Business adapter
+- [ ] Multi-tenant isolation
+- [ ] Second business adapter
 
 ---
 
-# 🧪 Final Evaluation
+# 70. Engineering Principles
 
-The final system should be evaluated using realistic conversations.
+The following principles should guide implementation.
 
-Example:
+### 1. Don't over-engineer before measuring.
+
+Build the simplest correct architecture first.
+
+### 2. Don't use an LLM where deterministic code is better.
+
+Pricing, validation, transactions, and authorization should remain deterministic.
+
+### 3. Don't use RAG where structured data is better.
+
+Current prices and inventory belong in databases/APIs.
+
+### 4. Don't hardcode business-specific behavior into the agent.
+
+Use configuration and adapters.
+
+### 5. Don't claim performance numbers without benchmarks.
+
+Every latency, concurrency, or cost number must come from an actual experiment.
+
+### 6. Don't optimize before identifying the bottleneck.
+
+Measure first.
+
+### 7. Treat AI output as untrusted input.
+
+Validate everything before executing critical actions.
+
+### 8. Design for failure.
+
+External services will fail.
+
+### 9. Keep the first deployment simple.
+
+Use a modular monolith before introducing unnecessary distributed complexity.
+
+### 10. Build for reuse, but prove reuse.
+
+Restaurant is the first implementation.
+
+A second business adapter is the proof that the abstraction works.
+
+---
+
+# 71. Final Architecture Philosophy
+
+VoiceOS is not fundamentally a restaurant bot.
+
+It is:
 
 ```text
-Customer:
-"Hi, I want two large chicken pizzas."
-
-AI:
-"Sure. Would you like any toppings or customizations?"
-
-Customer:
-"Add extra cheese to one and no onions on the other."
-
-AI:
-"Got it."
-
-Customer:
-"Also add one Coke."
-
-AI:
-"Done. Your cart has two large chicken pizzas and one Coke.
-The first pizza has extra cheese and the second has no onions.
-Your total is ₹XXX. Would you like delivery or pickup?"
-
-Customer:
-"Delivery."
-
-AI:
-"Please provide your delivery address."
-
-Customer:
-"[Address]"
-
-AI:
-"Your total is ₹XXX including delivery.
-Should I place the order?"
-
-Customer:
-"Yes."
-
-AI:
-"Your order has been placed successfully.
-Your order ID is #12345."
+             VOICEOS
+                │
+        ┌───────┴────────┐
+        │                │
+   Generic Core     Business Layer
+        │                │
+        │          ┌─────┼─────┐
+        │          │     │     │
+        │     Restaurant Salon Hotel
+        │
+        ├── Voice
+        ├── Agent
+        ├── RAG
+        ├── Tools
+        ├── State
+        ├── Evaluation
+        ├── Observability
+        └── Infrastructure
 ```
 
-The evaluation should verify:
+The first business proves the platform can execute a real transactional workflow.
 
-- Correct item recognition
-- Correct quantity
-- Correct customization
-- Correct cart state
-- Correct price
-- Correct tool sequence
-- Correct order creation
-- Correct final response
-- No hallucinated menu items
-- No incorrect pricing
-- No accidental order submission
+The second business proves that the architecture is reusable.
+
+The production benchmarks prove that the system is engineered rather than simply prototyped.
+
+The evaluation system proves that the AI behavior is measurable.
+
+The model/inference experiments demonstrate deeper AI engineering capability.
 
 ---
 
-# 🎯 Engineering Goals
+# 72. One-Line Architecture Summary
 
-DineVoice is designed to demonstrate practical AI engineering skills across the entire stack:
+> **VoiceOS is a configurable, multi-tenant AI voice-agent platform that combines real-time voice streaming, stateful LangGraph agents, RAG, validated tool execution, business adapters, transactional backends, evaluation, observability, and production infrastructure — with restaurant food ordering as its first reference implementation.**
+
+---
+
+# 73. Current Technology Decision
+
+The initial implementation uses:
 
 ```text
-                DineVoice
-                    │
-       ┌────────────┼────────────┐
-       │            │            │
-       ▼            ▼            ▼
-    Voice AI      Agent AI      RAG
-       │            │            │
-       └────────────┼────────────┘
-                    │
-                    ▼
-             AI Engineering
-                    │
-       ┌────────────┼────────────┐
-       │            │            │
-       ▼            ▼            ▼
-   Inference    Evaluation    Backend
-       │            │            │
-       └────────────┼────────────┘
-                    │
-                    ▼
-               Production
-                    │
-       ┌────────────┼────────────┐
-       ▼            ▼            ▼
-      AWS        Monitoring     Scaling
+Python
+FastAPI
+LiveKit
+WebRTC
+Streaming STT
+Streaming TTS
+LangGraph
+Pydantic
+PostgreSQL
+SQLAlchemy
+Alembic
+Redis
+Qdrant
+Docker
+AWS
+OpenTelemetry
+CloudWatch
+Pytest
+Locust
+Hugging Face
+PyTorch
+PEFT
+LoRA / QLoRA
+vLLM
 ```
 
----
+Technology should be replaced only when a measured requirement justifies the change.
 
-# 💡 What This Project Demonstrates
-
-DineVoice demonstrates experience with:
-
-- Real-time voice AI
-- Speech-to-text
-- Text-to-speech
-- WebRTC
-- LiveKit
-- LLM applications
-- LangGraph
-- Agentic workflows
-- Tool calling
-- Stateful agents
-- RAG
-- Vector databases
-- Reranking
-- Structured outputs
-- Backend API design
-- PostgreSQL
-- Redis
-- Async Python
-- Model benchmarking
-- LLM evaluation
-- Latency engineering
-- Model quantization
-- LoRA / QLoRA
-- vLLM
-- Docker
-- AWS
-- Observability
-- Load testing
-- Production reliability
+The architecture matters more than any individual vendor.
 
 ---
 
-# 🏆 Project Positioning
+# 74. Final Mental Model
 
-### Short Description
+When implementing any feature, ask:
 
-> **DineVoice is a production-grade AI voice agent that enables customers to order food directly from restaurants using natural voice conversations. It combines real-time streaming voice AI, LangGraph agent workflows, RAG, tool calling, restaurant ordering APIs, and production-focused latency, evaluation, and scalability engineering.**
+```text
+Is this:
 
-### Resume-Friendly Version
+1. Core Voice Infrastructure?
+2. Agent Capability?
+3. Business Configuration?
+4. Business Adapter?
+5. RAG Knowledge?
+6. Transactional Business Logic?
+7. External Integration?
+8. Evaluation?
+9. Observability?
+```
 
-> Built a production-oriented real-time AI voice ordering agent using LiveKit, Python, LangGraph, RAG, Qdrant, streaming STT/TTS, structured tool calling, PostgreSQL, and AWS, enabling customers to discover menu items, customize food, manage carts, and place orders through natural voice conversations.
+If the feature is clearly classified, it should be easier to decide where it belongs.
 
----
+The ultimate goal is:
 
-# 📌 Project Status
+```text
+                ONE CORE
+                   │
+       ┌───────────┼───────────┐
+       ▼           ▼           ▼
+   RESTAURANT    SALON       HOTEL
+       │           │           │
+       ▼           ▼           ▼
+   Ordering     Booking     Services
+```
 
-This project is being developed incrementally.
+while keeping:
 
-Architecture, benchmark tables, performance numbers, and production metrics will be updated as they are actually implemented and measured.
+```text
+Voice
+Agent
+RAG
+Evaluation
+Observability
+Infrastructure
+```
 
-**No benchmark or scalability number should be claimed unless it has been experimentally verified.**
+shared across all businesses.

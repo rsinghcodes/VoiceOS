@@ -1,6 +1,5 @@
 import pytest
-from app.ordering.cart import CartManager
-from app.agent.state import CartItem
+from app.capabilities.cart import CartManager, CartItem
 
 
 def test_add_item_to_cart():

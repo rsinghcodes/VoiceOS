@@ -5,7 +5,7 @@ from app.api.routes import api_router
 
 app = FastAPI(
     title=settings.app_name,
-    description="Production-grade AI Voice Agent for Restaurant Food Ordering",
+    description="VoiceOS — Production-grade Configurable AI Voice Agent Platform",
     version="0.1.0",
     debug=settings.debug,
 )

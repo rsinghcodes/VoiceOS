@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     )
 
     # Application
-    app_name: str = "DineVoice"
+    app_name: str = "VoiceOS"
     environment: str = "development"
     debug: bool = True
     host: str = "0.0.0.0"
@@ -35,7 +35,7 @@ class Settings(BaseSettings):
 
     # Database & Cache
     database_url: str = Field(
-        default="postgresql+asyncpg://postgres:postgres@localhost:5432/dinevoice",
+        default="postgresql+asyncpg://postgres:postgres@localhost:5432/voiceos",
         alias="DATABASE_URL",
     )
     redis_url: str = Field(default="redis://localhost:6379/0", alias="REDIS_URL")

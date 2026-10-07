@@ -1,1 +1,1 @@
-"""Agent workflow nodes."""
+"""Agent workflow nodes — intent routing, tool execution, response generation."""

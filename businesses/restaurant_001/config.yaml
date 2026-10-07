@@ -1,0 +1,37 @@
+business:
+  id: restaurant_001
+  type: restaurant
+  name: "Spice Symphony Restaurant"
+  tagline: "Authentic Flavors & Fresh Meals"
+
+voice:
+  language: en-IN
+  tone: friendly
+  speed: 1.0
+
+capabilities:
+  - catalog
+  - cart
+  - ordering
+  - delivery
+  - pickup
+  - tracking
+  - cancellation
+
+policies:
+  require_order_confirmation: true
+  allow_cancellation: true
+  cancellation_window_minutes: 5
+  min_order_amount: 150.0
+  delivery_fee: 40.0
+  tax_rate: 0.05
+  supported_payment_methods:
+    - cash_on_delivery
+    - online_payment
+    - pay_at_pickup
+
+terminology:
+  catalog: "Menu"
+  item: "Dish"
+  order_type_delivery: "Home Delivery"
+  order_type_pickup: "Store Takeaway"

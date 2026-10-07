@@ -1,1 +1,1 @@
-"""Voice streaming pipeline package (LiveKit, STT, TTS, VAD)."""
+"""Voice pipeline package — LiveKit, VAD, STT, TTS, interruption handling."""
