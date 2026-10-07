@@ -1,22 +1,13 @@
-"""
-Agent tools package.
+"""Agent tools package — schemas, registry, capability filtering, and dispatching."""
 
-Tools are the controlled interface between the LLM and business systems.
-Available tools are determined by the active business capabilities.
+from app.agent.tools.registry import (
+    TOOL_REGISTRY,
+    get_tools_for_capabilities,
+    execute_tool_call,
+)
 
-Generic tools:
-  search_catalog()
-  get_product()
-  check_availability()
-  create_cart()
-  get_cart()
-  add_to_cart()
-  update_cart()
-  remove_from_cart()
-  calculate_total()
-  create_order()
-  get_order_status()
-  cancel_order()
-  search_knowledge()
-  transfer_to_human()
-"""
+__all__ = [
+    "TOOL_REGISTRY",
+    "get_tools_for_capabilities",
+    "execute_tool_call",
+]

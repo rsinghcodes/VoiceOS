@@ -1,10 +1,6 @@
-"""
-Agent prompt templates.
+"""Agent prompt templates and layered prompt assembler."""
 
-Prompts are layered:
-  Base System Prompt
-    → Platform Rules
-      → Business Context ({{business.name}}, {{business.type}})
-        → Capability Instructions ({{capabilities}})
-          → Current Workflow
-"""
+from app.agent.prompts.builder import build_system_prompt
+from app.agent.prompts.base import BASE_SYSTEM_PROMPT
+
+__all__ = ["build_system_prompt", "BASE_SYSTEM_PROMPT"]
