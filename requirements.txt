@@ -1,0 +1,38 @@
+# Web Framework & Server
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+pydantic>=2.10.0
+pydantic-settings>=2.7.0
+python-dotenv>=1.0.1
+
+# Voice & Real-time (LiveKit Agents)
+livekit>=0.18.0
+livekit-agents>=0.12.0
+livekit-plugins-silero>=0.8.0
+livekit-plugins-deepgram>=0.8.0
+livekit-plugins-cartesia>=0.8.0
+
+# LLM & Agent Framework
+google-genai>=1.0.0
+langchain-google-genai>=2.0.0
+langgraph>=0.2.60
+langchain>=0.3.14
+langchain-core>=0.3.30
+
+# Database & Cache
+sqlalchemy[asyncio]>=2.0.36
+asyncpg>=0.30.0
+alembic>=1.14.0
+redis>=5.2.1
+
+# Vector Search (RAG)
+qdrant-client>=1.12.0
+
+# HTTP Client & Utilities
+httpx>=0.28.1
+structlog>=24.4.0
+
+# Testing & Evaluation
+pytest>=8.3.4
+pytest-asyncio>=0.25.2
+locust>=2.32.5
