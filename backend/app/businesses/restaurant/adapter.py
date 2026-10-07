@@ -30,9 +30,11 @@ class RestaurantAdapter(BusinessAdapter):
         config_path: Optional[str] = None,
         catalog_repo: Optional[CatalogRepository] = None,
         order_repo: Optional[OrderRepository] = None,
+        knowledge_retriever: Optional[Any] = None,
     ):
         self.catalog_repo = catalog_repo
         self.order_repo = order_repo
+        self.knowledge_retriever = knowledge_retriever
         self.carts: Dict[str, List[CartItem]] = {}
         self.orders: Dict[str, Dict[str, Any]] = {}  # In-memory fallback if order_repo is None
 
@@ -283,8 +285,17 @@ class RestaurantAdapter(BusinessAdapter):
         return {"order_id": transaction_id, "status": "CANCELLED", "reason": reason}
 
     # ---- Knowledge ----
-
+ 
     async def search_knowledge(self, query: str) -> List[Dict]:
+        if self.knowledge_retriever:
+            docs = await self.knowledge_retriever.retrieve(
+                business_id=self.business_id,
+                query=query,
+                top_k=2,
+            )
+            if docs:
+                return [{"answer": d["text"], "score": d.get("score")} for d in docs]
+
         q = query.lower()
         matches = [k for k in self.knowledge if k["query"] in q]
         return matches or [{"answer": f"For assistance with {self.business_name}, please speak with our host."}]
