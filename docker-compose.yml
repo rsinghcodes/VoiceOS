@@ -1,0 +1,68 @@
+version: "3.8"
+
+services:
+  # 1. VoiceOS API Web Service
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: voiceos_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - DEBUG=false
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/voiceos
+      - REDIS_URL=redis://redis:6379/0
+      - QDRANT_URL=http://qdrant:6333
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - LIVEKIT_URL=${LIVEKIT_URL}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+      - DEEPGRAM_API_KEY=${DEEPGRAM_API_KEY}
+      - CARTESIA_API_KEY=${CARTESIA_API_KEY}
+    depends_on:
+      - postgres
+      - redis
+      - qdrant
+
+  # 2. PostgreSQL Transactional Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: voiceos_postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: voiceos
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # 3. Redis Session Caching & Locks
+  redis:
+    image: redis:7-alpine
+    container_name: voiceos_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  # 4. Qdrant Multi-tenant Vector Database
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: voiceos_qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+volumes:
+  postgres_data:
+  redis_data:
+  qdrant_data:

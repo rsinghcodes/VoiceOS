@@ -1,1 +1,5 @@
-"""Observability — structured logging, distributed tracing, and metrics."""
+"""Observability package exports."""
+
+from app.observability.telemetry import TelemetryTracker
+
+__all__ = ["TelemetryTracker"]

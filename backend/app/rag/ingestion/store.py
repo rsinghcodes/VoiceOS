@@ -23,9 +23,24 @@ class QdrantKnowledgeStore:
         self,
         client: Optional[QdrantClient] = None,
         embedding_provider: Optional[EmbeddingProvider] = None,
-        location: str = ":memory:",
+        url: Optional[str] = None,
+        api_key: Optional[str] = None,
+        location: Optional[str] = None,
     ):
-        self.client = client or QdrantClient(location=location)
+        from app.config.settings import settings
+
+        if client is not None:
+            self.client = client
+        elif location:
+            self.client = QdrantClient(location=location)
+        else:
+            q_url = url or settings.qdrant_url
+            q_key = api_key or settings.qdrant_api_key
+            if q_url:
+                self.client = QdrantClient(url=q_url, api_key=q_key)
+            else:
+                self.client = QdrantClient(location=":memory:")
+
         self.embedder = embedding_provider or FastEmbeddingProvider()
         self._ensure_collection()
 
