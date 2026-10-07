@@ -166,3 +166,44 @@ async def test_agent_graph_human_handoff_routing():
     assert output["handoff_payload"] is not None
     assert output["handoff_payload"]["customer_id"] == "cust_123"
     assert "connecting you to a team member" in output["messages"][-1].content.lower()
+
+
+@pytest.mark.asyncio
+async def test_agent_graph_tool_loop_with_restaurant_adapter():
+    from app.businesses.restaurant.adapter import RestaurantAdapter
+
+    adapter = RestaurantAdapter()
+    graph = build_agent_graph(adapter=adapter)
+
+    # User asks what pizzas they have -> routes to execute_tools -> search_catalog -> response_generator
+    state = {
+        "session_id": "test_sess_tool_loop",
+        "business_id": "restaurant_001",
+        "customer_id": None,
+        "active_capabilities": ["catalog", "cart", "ordering"],
+        "messages": [HumanMessage(content="What chicken dishes do you have?")],
+        "intent": None,
+        "confidence": None,
+        "cart_id": None,
+        "order_id": None,
+        "booking_id": None,
+        "tool_results": [],
+        "retry_count": 0,
+        "max_retries": 3,
+        "error": None,
+        "handoff_reason": None,
+        "handoff_payload": None,
+        "workflow_status": "active",
+        "metadata": {},
+    }
+
+    config = {"configurable": {"thread_id": "thread_tool_loop"}}
+    output = await graph.ainvoke(state, config=config)
+
+    assert output["intent"] == "catalog_query"
+    assert len(output["tool_results"]) >= 1
+    assert output["tool_results"][0]["tool"] == "search_catalog"
+    assert output["tool_results"][0]["success"] is True
+    # Verify spoken response was synthesized from tool data
+    last_msg = output["messages"][-1].content
+    assert any(dish in last_msg for dish in ["Butter Chicken", "Chicken Biryani"])

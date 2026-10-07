@@ -1,1 +1,5 @@
-"""LLM provider implementations — Gemini, OpenAI, Anthropic, Local."""
+"""LLM providers package."""
+
+from app.llm.providers.gemini import GeminiProvider
+
+__all__ = ["GeminiProvider"]

@@ -108,6 +108,35 @@ def get_tools_for_capabilities(capabilities: List[str]) -> List[str]:
     ]
 
 
+def get_langchain_tools_for_capabilities(capabilities: List[str], adapter: BusinessAdapter) -> List[Any]:
+    """
+    Generate LangChain-compatible tool callables for LLM binding.
+    """
+    from langchain_core.tools import StructuredTool
+
+    tool_names = get_tools_for_capabilities(capabilities)
+    langchain_tools = []
+
+    for name in tool_names:
+        spec = TOOL_REGISTRY[name]
+
+        # Closure for tool dispatcher
+        async def _make_executor(t_name=name):
+            async def _exec(**kwargs):
+                return await execute_tool_call(tool_name=t_name, args=kwargs, adapter=adapter)
+            return _exec
+
+        t = StructuredTool.from_function(
+            coroutine=_make_executor(name),
+            name=name,
+            description=spec["description"],
+            args_schema=spec["schema"],
+        )
+        langchain_tools.append(t)
+
+    return langchain_tools
+
+
 async def execute_tool_call(
     tool_name: str,
     args: Dict[str, Any],
